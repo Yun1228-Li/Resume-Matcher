@@ -23,6 +23,17 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
+  const [groundingAcknowledged, setGroundingAcknowledged] = useState(false);
+
+  const groundingWarnings =
+    previewResult?.data.warnings?.filter((warning) =>
+      warning.startsWith('GROUNDING_REVIEW_REQUIRED:')
+    ) ?? [];
+
+  const groundingPaths = groundingWarnings.map((warning) => {
+    const match = warning.match(/Review (.+) against the source resume\./);
+    return match?.[1] ?? warning;
+  });
 
   const unsafePreviewReason = (() => {
     const summary = previewResult?.data.diff_summary;
@@ -61,6 +72,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     setConfirmError(null);
     setPreviewResult(null);
     setSavedResumeId(null);
+    setGroundingAcknowledged(false);
 
     try {
       const jobId = await uploadJobDescriptions([jd], resumeId);
@@ -74,6 +86,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         );
       }
 
+      setGroundingAcknowledged(false);
       setPreviewResult(result);
     } catch (failure) {
       setError(
@@ -88,6 +101,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     if (isConfirming) return;
     setPreviewResult(null);
     setConfirmError(null);
+    setGroundingAcknowledged(false);
   }, [isConfirming]);
 
   const confirmPreview = useCallback(async () => {
@@ -95,6 +109,11 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
 
     if (unsafePreviewReason) {
       setConfirmError(unsafePreviewReason);
+      return;
+    }
+
+    if (groundingWarnings.length > 0 && !groundingAcknowledged) {
+      setConfirmError('存在需要对照原始材料复核的改写。请先完成复核并勾选确认。');
       return;
     }
 
@@ -140,7 +159,14 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     } finally {
       setIsConfirming(false);
     }
-  }, [isConfirming, previewResult, resumeId, unsafePreviewReason]);
+  }, [
+    groundingAcknowledged,
+    groundingWarnings.length,
+    isConfirming,
+    previewResult,
+    resumeId,
+    unsafePreviewReason,
+  ]);
 
   return (
     <>
@@ -182,6 +208,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
                 setSavedResumeId(null);
                 setError(null);
                 setConfirmError(null);
+                setGroundingAcknowledged(false);
               }}
               disabled={isGenerating || isConfirming}
               className={
@@ -217,6 +244,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
             setSavedResumeId(null);
             setError(null);
             setConfirmError(null);
+            setGroundingAcknowledged(false);
           }}
           disabled={!factsConfirmed || isGenerating || isConfirming}
           placeholder="粘贴完整岗位 JD，建议包含职责、要求、技能关键词和加分项……"
@@ -292,6 +320,36 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
           </div>
         ) : null}
 
+        {previewResult && groundingWarnings.length > 0 ? (
+          <div className="border-2 border-amber-600 bg-amber-50 p-5 shadow-sw-default">
+            <div className="font-semibold text-amber-900">
+              需要人工对照原始材料复核
+            </div>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              后端检测到这些改写与原始文本重合度较低。它们不一定是错误，但不能自动视为真实。
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 font-mono text-xs text-amber-900">
+              {groundingPaths.map((path) => (
+                <li key={path}>{path}</li>
+              ))}
+            </ul>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 border border-amber-700 bg-white p-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={groundingAcknowledged}
+                onChange={(event) => {
+                  setGroundingAcknowledged(event.target.checked);
+                  setConfirmError(null);
+                }}
+                className="mt-1"
+              />
+              <span>
+                我已逐项对照客户原始材料，确认上述改写没有新增技能、职责、经历、数据或其他虚构事实。
+              </span>
+            </label>
+          </div>
+        ) : null}
+
         {confirmError && !previewResult ? (
           <div className="border-2 border-red-600 bg-red-50 p-4 text-sm text-red-700">
             {confirmError}
@@ -320,8 +378,16 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         detailedChanges={previewResult?.data.detailed_changes}
         errorMessage={confirmError ?? undefined}
         selectionSummary={previewResult?.data.bullet_selection}
-        confirmDisabled={Boolean(unsafePreviewReason)}
-        confirmDisabledReason={unsafePreviewReason ?? undefined}
+        confirmDisabled={Boolean(
+          unsafePreviewReason ||
+            (groundingWarnings.length > 0 && !groundingAcknowledged)
+        )}
+        confirmDisabledReason={
+          unsafePreviewReason ??
+          (groundingWarnings.length > 0 && !groundingAcknowledged
+            ? '存在需要人工对照原始材料复核的改写。请先完成复核并勾选确认。'
+            : undefined)
+        }
       />
     </>
   );
