@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ResumeUploadDialog } from '@/components/dashboard/resume-upload-dialog';
 import type {
   CustomSection,
   ResumeData,
@@ -108,6 +109,39 @@ export default function WorkbenchPage() {
   const [error, setError] = useState<string | null>(null);
   const [master, setMaster] = useState<ResumeListItem | null>(null);
   const [resume, setResume] = useState<ResumeData | null>(null);
+  const [uploadOpen, setUploadOpen] = useState(false);
+
+  const loadResumeById = useCallback(async (resumeId: string) => {
+    setState('loading');
+    setError(null);
+
+    try {
+      const rows = await fetchResumeList(true);
+      const selected = rows.find((item) => item.resume_id === resumeId);
+
+      if (!selected) {
+        throw new Error('没有找到刚上传的简历记录。');
+      }
+
+      if (selected.processing_status !== 'ready') {
+        throw new Error(`简历解析状态为 ${selected.processing_status}，暂时不能进入事实核验。`);
+      }
+
+      const detail = await fetchResume(selected.resume_id);
+      if (!detail.processed_resume) {
+        throw new Error('简历已经保存，但结构化数据为空。');
+      }
+
+      setMaster(selected);
+      setResume(detail.processed_resume as ResumeData);
+      setState('ready');
+    } catch (failure) {
+      setMaster(null);
+      setResume(null);
+      setState('error');
+      setError(failure instanceof Error ? failure.message : '读取简历失败。');
+    }
+  }, []);
 
   const loadMasterResume = useCallback(async () => {
     setState('loading');
@@ -123,24 +157,17 @@ export default function WorkbenchPage() {
         readyMasters.find((item) => item.is_default_master) ?? readyMasters[0];
 
       if (!selected) {
-        throw new Error('没有找到可用的主简历。请先在仪表板上传并完成解析。');
+        throw new Error('没有找到可用的主简历。请先上传一份客户简历。');
       }
 
-      const detail = await fetchResume(selected.resume_id);
-      if (!detail.processed_resume) {
-        throw new Error('主简历尚未生成结构化数据。');
-      }
-
-      setMaster(selected);
-      setResume(detail.processed_resume as ResumeData);
-      setState('ready');
+      await loadResumeById(selected.resume_id);
     } catch (failure) {
       setMaster(null);
       setResume(null);
       setState('error');
       setError(failure instanceof Error ? failure.message : '读取主简历失败。');
     }
-  }, []);
+  }, [loadResumeById]);
 
   useEffect(() => {
     void loadMasterResume();
@@ -178,14 +205,32 @@ export default function WorkbenchPage() {
               </p>
             </div>
 
-            <button
-              type="button"
-              onClick={() => void loadMasterResume()}
-              disabled={state === 'loading'}
-              className="border-2 border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase shadow-sw-default transition hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
-            >
-              {state === 'loading' ? '读取中...' : '重新读取'}
-            </button>
+            <div className="flex flex-wrap gap-2">
+              <ResumeUploadDialog
+                open={uploadOpen}
+                onOpenChange={setUploadOpen}
+                onUploadComplete={(resumeId) => {
+                  void loadResumeById(resumeId);
+                }}
+                trigger={
+                  <button
+                    type="button"
+                    className="border-2 border-black bg-blue-700 px-4 py-2 font-mono text-xs font-bold uppercase text-white shadow-sw-default transition hover:translate-x-[1px] hover:translate-y-[1px] hover:shadow-none"
+                  >
+                    上传客户简历
+                  </button>
+                }
+              />
+
+              <button
+                type="button"
+                onClick={() => void loadMasterResume()}
+                disabled={state === 'loading'}
+                className="border-2 border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase shadow-sw-default transition hover:bg-black hover:text-white disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {state === 'loading' ? '读取中...' : '读取默认主简历'}
+              </button>
+            </div>
           </div>
         </header>
 
@@ -375,8 +420,8 @@ export default function WorkbenchPage() {
                 当前节点
               </div>
               <div className="mt-2 text-sm leading-6 text-green-900">
-                已完成“读取默认主简历 → 展示结构化事实”。当前页面仍然是只读模式，
-                不会向后端提交任何修改。
+                已完成“上传/读取客户简历 → 展示结构化事实”。事实核验区仍然是只读模式，
+                不会修改简历内容。上传动作会在 Resume Matcher 中新增一条主简历记录；当前后端最多保留 5 条主简历。
               </div>
             </section>
           </div>
