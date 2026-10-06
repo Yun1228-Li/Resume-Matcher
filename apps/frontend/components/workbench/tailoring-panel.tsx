@@ -45,7 +45,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
 
     try {
       const jobId = await uploadJobDescriptions([jd], resumeId);
-      const result = await previewImproveResume(resumeId, jobId, 'keywords', {
+      const result = await previewImproveResume(resumeId, jobId, 'nudge', {
         maxBulletsPerEntry: 3,
       });
 
@@ -181,7 +181,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
             输入目标岗位 JD
           </h2>
           <p className="mt-1 text-sm leading-6 text-ink-soft">
-            AI 先生成预览；在你人工批准前，不会保存新的岗位定制简历。
+            AI 默认使用严格轻改模式（nudge）：只允许保守改写现有内容，不新增技能或新职责；在你人工批准前，不会保存新的岗位定制简历。
           </p>
         </div>
 
