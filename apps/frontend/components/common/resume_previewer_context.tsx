@@ -142,6 +142,9 @@ export interface Data {
   detailed_changes?: ResumeFieldDiff[];
   ats_score?: ATSScore;
   bullet_selection?: BulletSelectionSummary | null;
+  warnings?: string[];
+  refinement_attempted?: boolean;
+  refinement_successful?: boolean;
 }
 
 export interface ImprovedResult {
