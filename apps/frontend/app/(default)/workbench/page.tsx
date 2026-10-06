@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ResumeUploadDialog } from '@/components/dashboard/resume-upload-dialog';
+import { TailoringPanel } from '@/components/workbench/tailoring-panel';
 import type {
   CustomSection,
   ResumeData,
@@ -415,13 +416,15 @@ export default function WorkbenchPage() {
               </div>
             </section>
 
+            <TailoringPanel resumeId={master.resume_id} />
+
             <section className="border-2 border-green-700 bg-green-50 p-5 shadow-sw-default">
               <div className="font-mono text-xs font-bold uppercase text-green-800">
                 当前节点
               </div>
               <div className="mt-2 text-sm leading-6 text-green-900">
-                已完成“上传/读取客户简历 → 展示结构化事实”。事实核验区仍然是只读模式，
-                不会修改简历内容。上传动作会在 Resume Matcher 中新增一条主简历记录；当前后端最多保留 5 条主简历。
+                已完成“上传/读取客户简历 → 事实核验 → JD → AI 预览 → 人工批准后保存”的主链路接入。
+                原始事实展示保持只读；只有在差异审核窗口中点击批准，才会创建岗位定制简历。
               </div>
             </section>
           </div>
