@@ -24,6 +24,25 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
 
+  const unsafePreviewReason = (() => {
+    const summary = previewResult?.data.diff_summary;
+    if (!summary) return null;
+
+    if (summary.skills_added > 0) {
+      return `已检测到 ${summary.skills_added} 项新增技能。WorkBench V0.1 禁止保存任何新增技能，请拒绝并重新生成。`;
+    }
+
+    if (summary.certifications_added > 0) {
+      return `已检测到 ${summary.certifications_added} 项新增证书。WorkBench V0.1 禁止保存任何新增证书，请拒绝并重新生成。`;
+    }
+
+    if (summary.high_risk_changes > 0) {
+      return `已检测到 ${summary.high_risk_changes} 项高风险变更。WorkBench V0.1 仅允许低风险保守改写，因此禁止保存。`;
+    }
+
+    return null;
+  })();
+
   const generatePreview = useCallback(async () => {
     const jd = jobDescription.trim();
 
@@ -74,6 +93,11 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
   const confirmPreview = useCallback(async () => {
     if (!previewResult || isConfirming) return;
 
+    if (unsafePreviewReason) {
+      setConfirmError(unsafePreviewReason);
+      return;
+    }
+
     const expiresAt = Date.parse(previewResult.data.preview_expires_at ?? '');
     if (Number.isFinite(expiresAt) && expiresAt <= Date.now()) {
       setConfirmError('当前 AI 预览已经过期，请关闭审核窗口并重新生成。');
@@ -116,7 +140,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     } finally {
       setIsConfirming(false);
     }
-  }, [isConfirming, previewResult, resumeId]);
+  }, [isConfirming, previewResult, resumeId, unsafePreviewReason]);
 
   return (
     <>
@@ -246,14 +270,25 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         ) : null}
 
         {previewResult ? (
-          <div className="border-2 border-amber-500 bg-amber-50 p-5 shadow-sw-default">
-            <div className="font-semibold text-amber-900">
-              AI 预览已生成，等待人工审核
+          <div
+            className={
+              unsafePreviewReason
+                ? 'border-2 border-red-600 bg-red-50 p-5 shadow-sw-default'
+                : 'border-2 border-amber-500 bg-amber-50 p-5 shadow-sw-default'
+            }
+          >
+            <div className={unsafePreviewReason ? 'font-semibold text-red-800' : 'font-semibold text-amber-900'}>
+              {unsafePreviewReason ? 'AI 预览被安全闸门拦截' : 'AI 预览已生成，等待人工审核'}
             </div>
-            <div className="mt-2 text-sm text-amber-800">
+            <div className={unsafePreviewReason ? 'mt-2 text-sm text-red-700' : 'mt-2 text-sm text-amber-800'}>
               共 {previewResult.data.diff_summary?.total_changes ?? 0} 项变化；
               高风险变化 {previewResult.data.diff_summary?.high_risk_changes ?? 0} 项。
             </div>
+            {unsafePreviewReason ? (
+              <div className="mt-3 text-sm font-semibold text-red-800">
+                {unsafePreviewReason}
+              </div>
+            ) : null}
           </div>
         ) : null}
 
@@ -285,6 +320,8 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         detailedChanges={previewResult?.data.detailed_changes}
         errorMessage={confirmError ?? undefined}
         selectionSummary={previewResult?.data.bullet_selection}
+        confirmDisabled={Boolean(unsafePreviewReason)}
+        confirmDisabledReason={unsafePreviewReason ?? undefined}
       />
     </>
   );
