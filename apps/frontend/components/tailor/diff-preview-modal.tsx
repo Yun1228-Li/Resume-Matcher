@@ -21,6 +21,8 @@ interface DiffPreviewModalProps {
   detailedChanges?: ResumeFieldDiff[];
   errorMessage?: string;
   selectionSummary?: BulletSelectionSummary | null;
+  confirmDisabled?: boolean;
+  confirmDisabledReason?: string;
 }
 
 export function DiffPreviewModal({
@@ -33,6 +35,8 @@ export function DiffPreviewModal({
   detailedChanges,
   errorMessage,
   selectionSummary,
+  confirmDisabled = false,
+  confirmDisabledReason,
 }: DiffPreviewModalProps) {
   const { t } = useTranslations();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -85,7 +89,13 @@ export function DiffPreviewModal({
             <Button variant="outline" onClick={onClose} disabled={isConfirming} className="gap-2">
               {t('common.cancel')}
             </Button>
-            <Button variant="warning" onClick={onConfirm} disabled={isConfirming} className="gap-2">
+            <Button
+              variant="warning"
+              onClick={onConfirm}
+              disabled={isConfirming || confirmDisabled}
+              className="gap-2"
+              title={confirmDisabledReason}
+            >
               {isConfirming ? (
                 <>
                   <Loader2 className="w-4 h-4 animate-spin" />
@@ -339,6 +349,12 @@ export function DiffPreviewModal({
           )}
         </div>
 
+        {confirmDisabled && confirmDisabledReason && (
+          <div className="mt-4 border-2 border-red-600 bg-red-50 p-3 font-mono text-xs text-red-700">
+            {confirmDisabledReason}
+          </div>
+        )}
+
         {/* Action buttons */}
         <div className="flex justify-between items-center pt-4 border-t-2 border-black bg-white -mx-6 -mb-6 px-6 py-4">
           <Button variant="outline" onClick={onReject} disabled={isConfirming} className="gap-2">
@@ -351,7 +367,8 @@ export function DiffPreviewModal({
             )}
             <Button
               onClick={onConfirm}
-              disabled={isConfirming}
+              disabled={isConfirming || confirmDisabled}
+              title={confirmDisabledReason}
               className="gap-2 bg-success hover:bg-green-800"
             >
               {isConfirming ? (
