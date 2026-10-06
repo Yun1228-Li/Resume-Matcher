@@ -6,9 +6,11 @@ import type { ImprovedResult } from '@/components/common/resume_previewer_contex
 import { DiffPreviewModal } from '@/components/tailor/diff-preview-modal';
 import {
   confirmImproveResume,
+  downloadResumePdf,
   previewImproveResume,
   uploadJobDescriptions,
 } from '@/lib/api/resume';
+import { downloadBlobAsFile } from '@/lib/utils/download';
 
 interface TailoringPanelProps {
   resumeId: string;
@@ -23,6 +25,9 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
   const [error, setError] = useState<string | null>(null);
   const [confirmError, setConfirmError] = useState<string | null>(null);
   const [savedResumeId, setSavedResumeId] = useState<string | null>(null);
+  const [savedResumeName, setSavedResumeName] = useState<string>('岗位定制简历');
+  const [isDownloading, setIsDownloading] = useState(false);
+  const [deliveryError, setDeliveryError] = useState<string | null>(null);
   const [groundingAcknowledged, setGroundingAcknowledged] = useState(false);
 
   const groundingWarnings =
@@ -72,6 +77,7 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     setConfirmError(null);
     setPreviewResult(null);
     setSavedResumeId(null);
+    setDeliveryError(null);
     setGroundingAcknowledged(false);
 
     try {
@@ -150,7 +156,11 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         throw new Error('保存成功响应中缺少新的简历 ID。');
       }
 
+      const confirmedName =
+        previewResult.data.resume_preview.personalInfo?.name?.trim() || '岗位定制简历';
+      setSavedResumeName(confirmedName);
       setSavedResumeId(newResumeId);
+      setDeliveryError(null);
       setPreviewResult(null);
     } catch (failure) {
       setConfirmError(
@@ -167,6 +177,24 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
     resumeId,
     unsafePreviewReason,
   ]);
+
+  const downloadSavedResume = useCallback(async () => {
+    if (!savedResumeId || isDownloading) return;
+
+    setIsDownloading(true);
+    setDeliveryError(null);
+
+    try {
+      const blob = await downloadResumePdf(savedResumeId);
+      downloadBlobAsFile(blob, `${savedResumeName}-岗位定制简历.pdf`);
+    } catch (failure) {
+      setDeliveryError(
+        failure instanceof Error ? failure.message : 'PDF 导出失败，请检查后端和打印服务。'
+      );
+    } finally {
+      setIsDownloading(false);
+    }
+  }, [isDownloading, savedResumeId, savedResumeName]);
 
   return (
     <>
@@ -357,12 +385,63 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
         ) : null}
 
         {savedResumeId ? (
-          <div className="border-2 border-green-700 bg-green-50 p-5 shadow-sw-default">
-            <div className="font-semibold text-green-900">
-              人工批准完成，岗位定制简历已保存
+          <div className="space-y-4">
+            <div className="border-2 border-green-700 bg-green-50 p-5 shadow-sw-default">
+              <div className="font-semibold text-green-900">
+                人工批准完成，岗位定制简历已保存
+              </div>
+              <div className="mt-2 break-all font-mono text-xs text-green-800">
+                Resume ID: {savedResumeId}
+              </div>
             </div>
-            <div className="mt-2 break-all font-mono text-xs text-green-800">
-              Resume ID: {savedResumeId}
+
+            <div className="border-t-2 border-black pt-8">
+              <div className="font-mono text-xs font-bold uppercase text-blue-700">
+                STEP 5 / DELIVERY
+              </div>
+              <h2 className="mt-1 font-serif text-2xl font-bold text-ink">
+                成品预览与交付
+              </h2>
+              <p className="mt-1 text-sm leading-6 text-ink-soft">
+                先检查最终排版，再下载 PDF。需要手工微调时，可打开原生简历编辑器继续调整。
+              </p>
+
+              <div className="mt-4 flex flex-wrap gap-2">
+                <a
+                  href={`/builder?id=${encodeURIComponent(savedResumeId)}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="border-2 border-black bg-white px-4 py-2 font-mono text-xs font-bold uppercase shadow-sw-default hover:bg-black hover:text-white"
+                >
+                  打开简历编辑器
+                </a>
+
+                <button
+                  type="button"
+                  onClick={() => void downloadSavedResume()}
+                  disabled={isDownloading}
+                  className="border-2 border-black bg-green-700 px-4 py-2 font-mono text-xs font-bold uppercase text-white shadow-sw-default disabled:cursor-not-allowed disabled:opacity-50"
+                >
+                  {isDownloading ? '正在导出 PDF...' : '下载 PDF'}
+                </button>
+              </div>
+
+              {deliveryError ? (
+                <div className="mt-4 border-2 border-red-600 bg-red-50 p-4 text-sm text-red-700">
+                  {deliveryError}
+                </div>
+              ) : null}
+
+              <div className="mt-5 overflow-hidden border-2 border-black bg-white shadow-sw-default">
+                <div className="border-b-2 border-black bg-paper-tint px-4 py-2 font-mono text-xs font-bold uppercase">
+                  最终排版预览
+                </div>
+                <iframe
+                  title="最终岗位定制简历预览"
+                  src={`/print/resumes/${encodeURIComponent(savedResumeId)}?template=swiss-single&pageSize=A4&lang=zh`}
+                  className="h-[900px] w-full bg-white"
+                />
+              </div>
             </div>
           </div>
         ) : null}
