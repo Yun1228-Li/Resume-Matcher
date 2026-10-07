@@ -467,6 +467,12 @@ export function TailoringPanel({ resumeId }: TailoringPanelProps) {
             ? '存在需要人工对照原始材料复核的改写。请先完成复核并勾选确认。'
             : undefined)
         }
+        reviewPaths={groundingPaths}
+        reviewAcknowledged={groundingAcknowledged}
+        onReviewAcknowledgedChange={(checked) => {
+          setGroundingAcknowledged(checked);
+          setConfirmError(null);
+        }}
       />
     </>
   );
