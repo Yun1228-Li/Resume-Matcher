@@ -23,6 +23,9 @@ interface DiffPreviewModalProps {
   selectionSummary?: BulletSelectionSummary | null;
   confirmDisabled?: boolean;
   confirmDisabledReason?: string;
+  reviewPaths?: string[];
+  reviewAcknowledged?: boolean;
+  onReviewAcknowledgedChange?: (checked: boolean) => void;
 }
 
 export function DiffPreviewModal({
@@ -37,6 +40,9 @@ export function DiffPreviewModal({
   selectionSummary,
   confirmDisabled = false,
   confirmDisabledReason,
+  reviewPaths = [],
+  reviewAcknowledged = false,
+  onReviewAcknowledgedChange,
 }: DiffPreviewModalProps) {
   const { t } = useTranslations();
   const [expandedSections, setExpandedSections] = useState<Set<string>>(
@@ -348,6 +354,33 @@ export function DiffPreviewModal({
             </ChangeSection>
           )}
         </div>
+
+        {reviewPaths.length > 0 && onReviewAcknowledgedChange ? (
+          <div className="mt-4 border-2 border-amber-600 bg-amber-50 p-4">
+            <div className="font-semibold text-amber-900">
+              需要人工对照原始材料复核
+            </div>
+            <p className="mt-2 text-sm leading-6 text-amber-800">
+              以下改写与原始文本重合度较低。它们不一定错误，但必须逐项对照客户原始材料后才能保存。
+            </p>
+            <ul className="mt-3 list-disc space-y-1 pl-5 font-mono text-xs text-amber-900">
+              {reviewPaths.map((path) => (
+                <li key={path}>{path}</li>
+              ))}
+            </ul>
+            <label className="mt-4 flex cursor-pointer items-start gap-3 border border-amber-700 bg-white p-3 text-sm text-ink">
+              <input
+                type="checkbox"
+                checked={reviewAcknowledged}
+                onChange={(event) => onReviewAcknowledgedChange(event.target.checked)}
+                className="mt-1"
+              />
+              <span>
+                我已逐项对照客户原始材料，确认上述改写没有新增技能、职责、经历、数据或其他虚构事实。
+              </span>
+            </label>
+          </div>
+        ) : null}
 
         {confirmDisabled && confirmDisabledReason && (
           <div className="mt-4 border-2 border-red-600 bg-red-50 p-3 font-mono text-xs text-red-700">
